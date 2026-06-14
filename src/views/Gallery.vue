@@ -73,13 +73,13 @@
         </div>
 
         <div v-if="post.context" class="context-reveal">
-          <div class="context-section" v-if="post.context.prev">
-            <label>👆 上一条：</label>
-            <p>{{ post.context.prev }}</p>
+          <div class="context-section" v-for="(msg, idx) in normalizeContext(post.context.prev)" :key="'prev-' + idx">
+            <label>👆 前第 {{ normalizeContext(post.context.prev).length - idx }} 条：</label>
+            <p>{{ msg }}</p>
           </div>
-          <div class="context-section" v-if="post.context.next">
-            <label>👇 下一条：</label>
-            <p>{{ post.context.next }}</p>
+          <div class="context-section" v-for="(msg, idx) in normalizeContext(post.context.next)" :key="'next-' + idx">
+            <label>👇 后第 {{ idx + 1 }} 条：</label>
+            <p>{{ msg }}</p>
           </div>
         </div>
       </div>
@@ -105,6 +105,7 @@ const demoPosts = [
     date: Date.now() - 86400000,
     isSent: false,
     context: null,
+    contextConfig: { prevCount: 0, nextCount: 0 },
     tags: [{ type: 'miss', text: '思念' }],
     guesses: [
       { id: 'g1', text: '应该是异地恋，好久没见了吧？', likes: 12 },
@@ -119,9 +120,10 @@ const demoPosts = [
     date: Date.now() - 86400000 * 2,
     isSent: true,
     context: {
-      prev: '今天好累啊，先睡了',
-      next: '晚安呀，明天见 ❤️'
+      prev: ['今天好累啊，先睡了'],
+      next: ['晚安呀，明天见 ❤️']
     },
+    contextConfig: { prevCount: 1, nextCount: 1 },
     tags: [{ type: 'night', text: '晚安' }],
     guesses: [
       { id: 'g3', text: '好甜！应该是热恋期吧', likes: 25 }
@@ -135,6 +137,7 @@ const demoPosts = [
     date: Date.now() - 86400000 * 3,
     isSent: true,
     context: null,
+    contextConfig: { prevCount: 0, nextCount: 0 },
     tags: [{ type: 'sorry', text: '道歉' }],
     guesses: [
       { id: 'g4', text: '是不是又忘了什么纪念日？', likes: 32 },
@@ -146,12 +149,19 @@ const demoPosts = [
   }
 ]
 
+function normalizeContext(data) {
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  return [data]
+}
+
 function revealContext(post) {
   if (!post.context) {
     post.context = {
-      prev: '这是上一条消息的内容',
-      next: '这是下一条消息的内容'
+      prev: ['这是上一条消息的内容示例'],
+      next: ['这是下一条消息的内容示例']
     }
+    post.contextConfig = { prevCount: 1, nextCount: 1 }
   }
 }
 

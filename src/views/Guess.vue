@@ -109,10 +109,14 @@
           </div>
 
           <div class="context-content">
-            <div class="context-item" v-if="currentPost.context.prev">
-              <label>👆 上一条消息：</label>
+            <div 
+              class="context-item" 
+              v-for="(msg, idx) in normalizeContext(currentPost.context.prev)" 
+              :key="'prev-' + idx"
+            >
+              <label>👆 前第 {{ normalizeContext(currentPost.context.prev).length - idx }} 条消息：</label>
               <div class="context-message">
-                "{{ currentPost.context.prev }}"
+                "{{ msg }}"
               </div>
             </div>
 
@@ -123,10 +127,14 @@
               </div>
             </div>
 
-            <div class="context-item" v-if="currentPost.context.next">
-              <label>👇 下一条消息：</label>
+            <div 
+              class="context-item" 
+              v-for="(msg, idx) in normalizeContext(currentPost.context.next)" 
+              :key="'next-' + idx"
+            >
+              <label>👇 后第 {{ idx + 1 }} 条消息：</label>
               <div class="context-message">
-                "{{ currentPost.context.next }}"
+                "{{ msg }}"
               </div>
             </div>
           </div>
@@ -171,6 +179,12 @@ const sortOptions = [
   { value: 'oldest', label: '最早' }
 ]
 
+function normalizeContext(data) {
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  return [data]
+}
+
 const currentPost = computed(() => {
   const id = route.params.id
   let post = store.anonymousPosts.find(p => p.id === id)
@@ -183,6 +197,7 @@ const currentPost = computed(() => {
         date: Date.now() - 86400000,
         isSent: false,
         context: null,
+        contextConfig: { prevCount: 0, nextCount: 0 },
         tags: [{ type: 'miss', text: '思念' }],
         guesses: [
           { id: 'g1', text: '应该是异地恋，好久没见了吧？', likes: 12, date: Date.now() - 7200000 },
@@ -197,9 +212,10 @@ const currentPost = computed(() => {
         date: Date.now() - 86400000 * 2,
         isSent: true,
         context: {
-          prev: '今天好累啊，先睡了',
-          next: '晚安呀，明天见 ❤️'
+          prev: ['今天好累啊，先睡了'],
+          next: ['晚安呀，明天见 ❤️']
         },
+        contextConfig: { prevCount: 1, nextCount: 1 },
         tags: [{ type: 'night', text: '晚安' }],
         guesses: [
           { id: 'g3', text: '好甜！应该是热恋期吧', likes: 25, date: Date.now() - 86400000 }
@@ -213,6 +229,7 @@ const currentPost = computed(() => {
         date: Date.now() - 86400000 * 3,
         isSent: true,
         context: null,
+        contextConfig: { prevCount: 0, nextCount: 0 },
         tags: [{ type: 'sorry', text: '道歉' }],
         guesses: [
           { id: 'g4', text: '是不是又忘了什么纪念日？', likes: 32, date: Date.now() - 86400000 * 2 },
@@ -261,9 +278,10 @@ function submitGuess() {
   
   if (currentPost.value.guesses.length >= 5 && !currentPost.value.context) {
     currentPost.value.context = {
-      prev: '这是上一条消息的内容示例',
-      next: '这是下一条消息的内容示例'
+      prev: ['这是上一条消息的内容示例'],
+      next: ['这是下一条消息的内容示例']
     }
+    currentPost.value.contextConfig = { prevCount: 1, nextCount: 1 }
   }
 }
 
@@ -300,15 +318,19 @@ function formatDate(timestamp) {
 function analyzeContext(post) {
   if (!post.context) return ''
   
-  const hasPrev = !!post.context.prev
-  const hasNext = !!post.context.next
+  const prevList = normalizeContext(post.context.prev)
+  const nextList = normalizeContext(post.context.next)
+  const hasPrev = prevList.length > 0
+  const hasNext = nextList.length > 0
+  const prevCount = prevList.length
+  const nextCount = nextList.length
   
   if (hasPrev && hasNext) {
-    return '这是一段双向对话中的消息，前后都有互动，可以看出对话的连贯性。'
+    return `这是一段双向对话中的消息，前面公开了 ${prevCount} 条、后面公开了 ${nextCount} 条，可以看出对话的连贯性。`
   } else if (hasPrev) {
-    return '这条消息是对上一条的回复，可以看出两人的互动关系。'
+    return `这条消息的前面公开了 ${prevCount} 条上下文，可以看出这条消息是对之前内容的回复，两人的互动关系紧密。`
   } else if (hasNext) {
-    return '这条消息引出了对方的回复，是对话中的主动发起方。'
+    return `这条消息的后面公开了 ${nextCount} 条上下文，可见这条消息引出了对方的后续回复，是对话中的主动发起方。`
   }
   
   return '这是一条独立的消息，但仍能从中感受到情感的温度。'

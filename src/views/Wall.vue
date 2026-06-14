@@ -189,11 +189,23 @@
           </div>
           
           <div class="options">
-            <label>
-              <input type="checkbox" v-model="hangUpOptions.hideContext" />
-              隐藏上下文（让大家猜）
-            </label>
-            <label>
+            <div class="context-option">
+              <label class="option-label">👆 公开前面几条：</label>
+              <select v-model="hangUpOptions.prevCount" class="context-select">
+                <option v-for="opt in contextCountOptions" :key="'prev-' + opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+            <div class="context-option">
+              <label class="option-label">👇 公开后面几条：</label>
+              <select v-model="hangUpOptions.nextCount" class="context-select">
+                <option v-for="opt in contextCountOptions" :key="'next-' + opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+            <label class="checkbox-label">
               <input type="checkbox" v-model="hangUpOptions.anonymous" />
               完全匿名（不显示任何联系方式）
             </label>
@@ -223,9 +235,17 @@ const showHangUpModal = ref(false);
 const selectedMessageToHang = ref(null);
 const selectedLetterToHang = ref(null);
 const hangUpOptions = ref({
- hideContext: true,
+ prevCount: 0,
+ nextCount: 0,
  anonymous: true
 });
+const contextCountOptions = [
+ { value: 0, label: '不公开' },
+ { value: 1, label: '1 条' },
+ { value: 2, label: '2 条' },
+ { value: 3, label: '3 条' },
+ { value: 5, label: '5 条' }
+];
 const messageRefs = ref({});
 const displayModes = [
  { value: 'all', label: '全部' },
@@ -320,21 +340,29 @@ function viewConversation(letter) {
 function hangUp(letter, msg) {
  selectedMessageToHang.value = msg;
  selectedLetterToHang.value = letter;
+ hangUpOptions.value = {
+ prevCount: 0,
+ nextCount: 0,
+ anonymous: true
+ };
  showHangUpModal.value = true;
 }
 function confirmHangUp() {
  if (!selectedMessageToHang.value || !selectedLetterToHang.value)
  return;
+ const prevCount = hangUpOptions.value.prevCount;
+ const nextCount = hangUpOptions.value.nextCount;
+ const prev = prevCount > 0 ? getContextMessages(selectedLetterToHang.value, selectedMessageToHang.value, -1, prevCount) : [];
+ const next = nextCount > 0 ? getContextMessages(selectedLetterToHang.value, selectedMessageToHang.value, 1, nextCount) : [];
+ const hasContext = prev.length > 0 || next.length > 0;
  const post = {
  id: Math.random().toString(36).substr(2, 9),
  message: selectedMessageToHang.value.body,
  messageId: selectedMessageToHang.value.id,
  date: Date.now(),
  isSent: selectedMessageToHang.value.isSent,
- context: hangUpOptions.value.hideContext ? null : {
- prev: getContextMessage(selectedLetterToHang.value, selectedMessageToHang.value, -1),
- next: getContextMessage(selectedLetterToHang.value, selectedMessageToHang.value, 1)
- },
+ context: hasContext ? { prev, next } : null,
+ contextConfig: { prevCount, nextCount },
  tags: selectedMessageToHang.value.highlights || [],
  guesses: [],
  anonymous: hangUpOptions.value.anonymous,
@@ -346,14 +374,25 @@ function confirmHangUp() {
  selectedLetterToHang.value = null;
  router.push('/gallery');
 }
-function getContextMessage(letter, msg, direction) {
+function getContextMessages(letter, msg, direction, count) {
  const messages = letter.highlightedMessages;
  const idx = messages.findIndex(m => m.id === msg.id);
- const contextIdx = idx + direction;
+ const result = [];
+ for (let i = 1; i <= count; i++) {
+ const contextIdx = idx + direction * i;
  if (contextIdx >= 0 && contextIdx < messages.length) {
- return messages[contextIdx].body;
+ if (direction > 0) {
+ result.push(messages[contextIdx].body);
  }
- return null;
+ else {
+ result.unshift(messages[contextIdx].body);
+ }
+ }
+ else {
+ break;
+ }
+ }
+ return result;
 }
 function formatDate(timestamp) {
  const d = new Date(timestamp);
@@ -736,15 +775,43 @@ onMounted(() => {
 .options {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
   margin: 1.5rem 0;
 }
 
-.options label {
+.options .checkbox-label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
+}
+
+.context-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.option-label {
+  color: var(--text-dark);
+  font-size: 0.95rem;
+}
+
+.context-select {
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: border-color 0.3s;
+  min-width: 120px;
+}
+
+.context-select:focus {
+  outline: none;
+  border-color: var(--love-pink);
 }
 
 .modal-actions {
